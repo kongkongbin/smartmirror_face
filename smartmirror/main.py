@@ -1,0 +1,193 @@
+import sys
+import os
+import cv2
+import tempfile
+import numpy as np
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QMessageBox, QDesktopWidget
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
+from PyQt5.QtGui import QImage, QPixmap
+
+# UI 관련 모듈 임포트
+from ui_pages.home_page import HomePage
+from ui_pages.capture_page import ProductCapturePage, FaceCapturePage
+from ui_pages.result_pages import FaceResultPage, ProductRecommendPage
+from ui_pages.loading_page import LoadingPage
+
+# 웹캠 스레드 모듈 임포트
+from webcam_thread.webcam import WebcamThread
+
+# 분석 스레드 모듈 임포트
+from analysis_worker import AnalysisWorker
+
+# 데이터베이스 관리 모듈 임포트
+from db_manager.database import DatabaseManager
+
+class BeautyFinderApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("AI 뷰티 파인더")
+        
+        self.setGeometry(100, 100, 800, 600) 
+        self.setFixedSize(self.width(), self.height())
+        self.center()
+        
+        self.webcam_last_frame = None
+        self.webcam_thread = None
+        self.db_manager = DatabaseManager()
+
+        self.user_tone = None
+        self.user_color = None
+        self.user_skin_type = None
+
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+
+        self.stacked_widget = QStackedWidget()
+        self.main_layout.addWidget(self.stacked_widget)
+
+        self.create_pages()
+        self.apply_styles()
+        
+        self.stacked_widget.setCurrentWidget(self.pages['home'])
+    
+    def create_pages(self):
+        self.pages = {}
+        
+        self.pages['home'] = HomePage(self)
+        self.pages['product_capture'] = ProductCapturePage(self)
+        self.pages['face_capture'] = FaceCapturePage(self)
+        self.pages['face_result'] = FaceResultPage(self)
+        self.pages['product_recommend'] = ProductRecommendPage(self)
+        self.pages['loading'] = LoadingPage(self)
+        
+        self.stacked_widget.addWidget(self.pages['home'])
+        self.stacked_widget.addWidget(self.pages['product_capture'])
+        self.stacked_widget.addWidget(self.pages['face_capture'])
+        self.stacked_widget.addWidget(self.pages['face_result'])
+        self.stacked_widget.addWidget(self.pages['product_recommend'])
+        self.stacked_widget.addWidget(self.pages['loading'])
+        
+        self.pages['home'].product_btn.clicked.connect(self.show_product_capture)
+        self.pages['home'].face_btn.clicked.connect(self.show_face_capture)
+        self.pages['product_capture'].home_btn.clicked.connect(self.go_home)
+        self.pages['face_capture'].home_btn.clicked.connect(self.go_home)
+        self.pages['face_result'].go_home_btn.clicked.connect(self.go_home)
+        self.pages['product_recommend'].go_home_btn.clicked.connect(self.go_home)
+        
+        self.pages['product_capture'].capture_btn.clicked.connect(self.start_product_analysis)
+        self.pages['face_capture'].capture_btn.clicked.connect(self.start_face_analysis)
+
+    def start_product_analysis(self):
+        QMessageBox.information(self, "안내", "제품 분석 기능을 시작합니다.")
+
+    def start_face_analysis(self):
+        if self.webcam_last_frame is None or self.webcam_last_frame.size == 0:
+            QMessageBox.warning(self, "안내", "웹캠 프레임을 아직 받지 못했어요.")
+            return
+
+        self.stop_webcam()
+        self.stacked_widget.setCurrentWidget(self.pages['loading'])
+        QApplication.processEvents()
+
+        self.analysis_thread = AnalysisWorker(self.webcam_last_frame)
+        self.analysis_thread.finished_ok.connect(self.on_analysis_done)
+        self.analysis_thread.finished_err.connect(self.on_analysis_error)
+        self.analysis_thread.start()
+
+    def on_analysis_done(self, user_tone_num, user_color):
+        self.user_tone = user_tone_num
+        self.user_color = user_color
+        
+        result_data = self.db_manager.get_beauty_data(self.user_tone, self.user_color)
+        if result_data:
+            self.pages['face_result'].update_result(result_data)
+            self.stacked_widget.setCurrentWidget(self.pages['face_result'])
+        else:
+            QMessageBox.critical(self, "오류", "분석 결과를 불러오는 데 실패했어요.")
+            self.go_home()
+            
+    def on_analysis_error(self, msg):
+        QMessageBox.critical(self, "분석 오류", msg)
+        self.go_home()
+    
+    def apply_styles(self):
+        self.setStyleSheet("""
+            QWidget { background-color: #fdf6f9; }
+            QPushButton#main_menu_btn {
+                background-color: #ff87ab;
+                color: white;
+                font-size: 2.5em;
+                font-weight: bold;
+                padding: 40px 60px;
+                border: 1px solid #ff87ab;
+                border-radius: 20px;
+            }
+            QPushButton#main_menu_btn:hover {
+                background-color: #e67a9a;
+            }
+            QPushButton#capture_btn {
+                background-color: #87e3ff;
+                color: white;
+                font-size: 2em;
+                font-weight: bold;
+                padding: 30px;
+                border-radius: 50px;
+            }
+            QPushButton#capture_btn:hover {
+                background-color: #7ac8e6;
+            }
+            QPushButton#home_btn {
+                background-color: #ccc;
+                color: white;
+                font-size: 2em;
+                font-weight: bold;
+                padding: 30px;
+                border-radius: 50px;
+            }
+            QPushButton#home_btn:hover {
+                background-color: #bbb;
+            }
+        """)
+
+    def go_home(self):
+        self.stop_webcam()
+        self.stacked_widget.setCurrentWidget(self.pages['home'])
+
+    def show_product_capture(self):
+        self.start_webcam_and_connect(self.pages['product_capture'])
+        self.stacked_widget.setCurrentWidget(self.pages['product_capture'])
+
+    def show_face_capture(self):
+        self.start_webcam_and_connect(self.pages['face_capture'])
+        self.stacked_widget.setCurrentWidget(self.pages['face_capture'])
+        
+    def start_webcam_and_connect(self, page_widget):
+        if self.webcam_thread is not None and self.webcam_thread.isRunning():
+            self.webcam_thread.stop()
+            self.webcam_thread.wait()
+            
+        self.webcam_thread = WebcamThread()
+        self.webcam_thread.change_pixmap_signal.connect(page_widget.update_frame)
+        self.webcam_thread.start()
+    
+    def stop_webcam(self):
+        if self.webcam_thread is not None and self.webcam_thread.isRunning():
+            self.webcam_thread.stop()
+            self.webcam_thread.wait()
+            
+    def closeEvent(self, event):
+        self.stop_webcam()
+        event.accept()
+        
+    def center(self):
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    main_app = BeautyFinderApp()
+    main_app.show()
+    sys.exit(app.exec_())
