@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QScrollArea, QFrame, QGridLayout, QHBoxLayout
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QScrollArea, QFrame, QGridLayout, QHBoxLayout, QSizePolicy, QSpacerItem
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QImage, QFont
 
@@ -52,20 +52,28 @@ class FaceResultPage(QWidget):
         self.user_color_desc.setText(data.get('desc', ''))
         
         # 추천 제품 카드 추가
-        if 'products' in data:
-            for i, product in enumerate(data['products']):
-                self.create_product_card(product, self.product_grid, i)
+        products = data.get('products') or []
+        if not products:
+            empty = QLabel("표시할 추천 제품이 아직 없어요.", objectName="desc")
+            empty.setAlignment(Qt.AlignCenter)
+            self.product_grid.addWidget(empty, 0, 0)
+            return
+        for i, product in enumerate(products):
+            self.create_product_card(product, self.product_grid, i)
 
     def create_product_card(self, product, layout, index):
         card = QFrame()
         card.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 10px; padding: 10px; }")
         card_layout = QVBoxLayout(card)
         
-        name_label = QLabel(product.get('name', ''))
-        desc_label = QLabel(product.get('description', ''))
+        title = QLabel(f"{product.get('brand','')} · {product.get('name','')}")
+        meta = QLabel(" | ".join(filter(None, [product.get('type',''), product.get('price','')])))
+        desc = QLabel(product.get('description', ''))
+        desc.setWordWrap(True)
         
-        card_layout.addWidget(name_label)
-        card_layout.addWidget(desc_label)
+        card_layout.addWidget(title)
+        card_layout.addWidget(meta)
+        card_layout.addWidget(desc)
         
         layout.addWidget(card, index // 2, index % 2)
 
@@ -101,3 +109,49 @@ class ProductRecommendPage(QWidget):
         main_layout.addWidget(self.recommend_title)
         main_layout.addWidget(scroll_area)
         main_layout.addWidget(self.go_home_btn)
+
+    def update_recommendations(self, data: dict):
+        # data = {'found_product': {...}, 'recommendations': [...]}
+        self.clear_layout(self.product_grid)
+
+        found = data.get('found_product')
+        recs = data.get('recommendations') or []
+
+        row = 0
+        if found:
+            header = QLabel("🔎 인식된 제품", objectName="h3")
+            self.product_grid.addWidget(header, row, 0, 1, 2); row += 1
+            self._add_card(found, row, 0, span=2); row += 2  # 여백 포함
+
+        header2 = QLabel("✨ 비슷한 추천 제품", objectName="h3")
+        self.product_grid.addWidget(header2, row, 0, 1, 2); row += 1
+
+        if not recs:
+            empty = QLabel("추천 제품이 아직 없어요.", objectName="desc")
+            empty.setAlignment(Qt.AlignCenter)
+            self.product_grid.addWidget(empty, row, 0, 1, 2)
+            return
+
+        for i, p in enumerate(recs):
+            r = row + (i // 2)
+            c = i % 2
+            self._add_card(p, r, c)
+
+    def _add_card(self, product, r, c, span=1):
+        card = QFrame()
+        card.setStyleSheet("QFrame { border: 1px solid #ddd; border-radius: 10px; padding: 10px; }")
+        v = QVBoxLayout(card)
+        title = QLabel(f"{product.get('brand','')} · {product.get('name','')}")
+        meta = QLabel(" | ".join(filter(None, [product.get('type',''), product.get('price','')])))
+        desc = QLabel(product.get('description', ''))
+        desc.setWordWrap(True)
+        v.addWidget(title); v.addWidget(meta); v.addWidget(desc)
+        self.product_grid.addWidget(card, r, c, 1, span)
+
+    def clear_layout(self, layout):
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()

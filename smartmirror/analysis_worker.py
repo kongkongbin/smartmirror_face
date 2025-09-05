@@ -1,9 +1,8 @@
-# analysis_worker.py
-
 import sys
 import cv2
 import tempfile
 import os
+import json
 from PyQt5.QtCore import QThread, pyqtSignal
 from personal_color_analysis.detect_face import DetectFace
 from personal_color_analysis.color_extract import DominantColors
@@ -13,7 +12,7 @@ from colormath.color_conversions import convert_color
 import numpy as np
 
 class AnalysisWorker(QThread):
-    finished_ok = pyqtSignal(str, str)
+    finished_ok = pyqtSignal(str, str, float)
     finished_err = pyqtSignal(str)
 
     def __init__(self, img_bgr, parent=None):
@@ -23,9 +22,27 @@ class AnalysisWorker(QThread):
     def run(self):
         tmp_path = None
         try:
+            # 윈도우 환경에 맞춰 회전 로직 제거
+            rotated_bgr = self.img_bgr
+            
+            (h, w) = rotated_bgr.shape[:2]
+            if w > 640:
+                r = 640 / float(w)
+                dim = (640, int(h * r))
+                resized_bgr = cv2.resize(rotated_bgr, dim, interpolation=cv2.INTER_AREA)
+            else:
+                resized_bgr = rotated_bgr
+            
+            lab = cv2.cvtColor(resized_bgr, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            cl = clahe.apply(l)
+            limg = cv2.merge((cl, a, b))
+            final_bgr = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+            
             fd, tmp_path = tempfile.mkstemp(suffix=".jpg")
             os.close(fd)
-            cv2.imwrite(tmp_path, self.img_bgr)
+            cv2.imwrite(tmp_path, final_bgr)
             
             df = DetectFace(tmp_path)
             face = [df.left_cheek, df.right_cheek, df.left_eyebrow, df.right_eyebrow, df.left_eye, df.right_eye]
@@ -40,13 +57,14 @@ class AnalysisWorker(QThread):
             eyebrow = np.mean([temp[2], temp[3]], axis=0)
             eye = np.mean([temp[4], temp[5]], axis=0)
 
-            Lab_b, hsv_s = [], []
+            Lab_l, Lab_b, hsv_s = [], [], []
             color = [cheek, eyebrow, eye]
             for i in range(3):
                 rgb = sRGBColor(color[i][0], color[i][1], color[i][2], is_upscaled=True)
-                lab = convert_color(rgb, LabColor, through_rgb_type=sRGBColor)
+                lab_color = convert_color(rgb, LabColor, through_rgb_type=sRGBColor)
                 hsv = convert_color(rgb, HSVColor, through_rgb_type=sRGBColor)
-                Lab_b.append(float(format(lab.lab_b, ".2f")))
+                Lab_l.append(float(format(lab_color.lab_l, ".2f")))
+                Lab_b.append(float(format(lab_color.lab_b, ".2f")))
                 hsv_s.append(float(format(hsv.hsv_s, ".2f")) * 100)
 
             Lab_weight = [30, 20, 5]
@@ -54,24 +72,33 @@ class AnalysisWorker(QThread):
             
             if is_warm(Lab_b, Lab_weight):
                 if is_spr(hsv_s, hsv_weight):
-                    tone = 'spring_warm'
+                    personal_color = 'spring_warm'
                 else:
-                    tone = 'fall_warm'
+                    personal_color = 'fall_warm'
             else:
                 if is_smr(hsv_s, hsv_weight):
-                    tone = 'summer_cool'
+                    personal_color = 'summer_cool'
                 else:
-                    tone = 'winter_cool'
+                    personal_color = 'winter_cool'
             
-            gray = cv2.cvtColor(self.img_bgr, cv2.COLOR_BGR2GRAY)
-            brightness = float(gray.mean())
-            user_tone_num = '20' if brightness >= 120 else '21'
+            avg_lab_l = np.mean(Lab_l)
+            
+            if avg_lab_l >= 80:
+                user_tone_num = '20'
+            elif avg_lab_l >= 60:
+                user_tone_num = '21'
+            elif avg_lab_l >= 40:
+                user_tone_num = '22'
+            else:
+                user_tone_num = '23'
+            
+            brightness = float(avg_lab_l)
 
-            self.finished_ok.emit(user_tone_num, tone)
+            self.finished_ok.emit(user_tone_num, personal_color, brightness)
             
         except RuntimeError as e:
             if str(e) == "No face detected in the image.":
-                cv2.imwrite('error_image.jpg', self.img_bgr)
+                cv2.imwrite('dlib_error.jpg', self.img_bgr)
                 self.finished_err.emit("이미지에서 얼굴을 찾을 수 없어요. 조명과 얼굴 위치를 확인해주세요.")
             else:
                 self.finished_err.emit(str(e))

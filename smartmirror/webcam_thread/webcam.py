@@ -1,44 +1,80 @@
-# webcam_thread/webcam.py
-
 import cv2
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QImage
+import platform, cv2
 
 class WebcamThread(QThread):
-    # QImage 형식의 프레임과 원본 numpy 배열을 보내는 시그널
+    # UI 표시용(QImage, 미러 적용) + 분석용 원본 ndarray(미러 미적용)
     change_pixmap_signal = pyqtSignal(QImage, object)
 
-    def __init__(self, parent=None):
+    def __init__(self, rotate=False, mirror=True, parent=None):
         super().__init__(parent)
-        self.running = True
+        self._running = True
+        self.cap = None
+        self.rotate = rotate
+        self.mirror = mirror
 
     def run(self):
-        # 웹캠 초기화 (cv2.CAP_DSHOW를 명시하여 백엔드 변경)
+        # CAP_DSHOW는 Windows에서 카메라 초기화 속도 개선
         self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         if not self.cap.isOpened():
             print("Error: 웹캠을 열 수 없습니다.")
-            self.running = False
+            self._running = False
             return
 
-        while self.running:
+        while self._running:
             ret, frame = self.cap.read()
-            if ret:
-                # 젯슨 나노의 세로 모니터 환경에 맞춰 프레임 회전
-                # 세로 캠 설치 시, 가로 프레임을 회전하여 세로로 만들어야 합니다.
-                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            if not ret:
+                continue
 
-                # 좌우반전
-                frame = cv2.flip(frame, 1)
+            # 분석용 원본 프레임(미러 미적용)
+            raw = frame.copy()
 
-                # OpenCV BGR 포맷을 PyQt QImage 포맷으로 변환
-                h, w, ch = frame.shape
-                qimg = QImage(frame.data, w, h, ch * w, QImage.Format_BGR888)
-                
-                # 메인 UI로 시그널 전송
-                self.change_pixmap_signal.emit(qimg, frame)
+            # 회전은 두 경로 모두 동일하게 적용(필요시 옵션)
+            if self.rotate:
+                raw = cv2.rotate(raw, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-        self.cap.release()
+            # 화면 표시용은 보기 좋게 미러 적용 가능
+            disp = raw.copy()
+            if self.mirror:
+                disp = cv2.flip(disp, 1)
+
+            h, w, ch = disp.shape
+            bytes_per_line = ch * w
+            qimg = QImage(disp.data, w, h, bytes_per_line, QImage.Format_BGR888).copy()  # 수명 안전
+
+            self.change_pixmap_signal.emit(qimg, raw)
+
+        if self.cap:
+            self.cap.release()
+
+        def _gst_pipeline_csi(width=1280, height=720, fps=30, flip_method=0):
+            return (
+                f"nvarguscamerasrc ! video/x-raw(memory:NVMM), width={width}, height={height}, "
+                f"format=NV12, framerate={fps}/1 ! nvvidconv flip-method={flip_method} ! "
+                f"video/x-raw, format=BGRx ! videoconvert ! video/x-raw, format=BGR ! appsink"
+            )
+
+    def _gst_pipeline_usb(dev_index=0, width=1280, height=720, fps=30):
+        return (
+            f"v4l2src device=/dev/video{dev_index} ! video/x-raw, width={width}, height={height}, framerate={fps}/1 ! "
+            f"videoconvert ! video/x-raw, format=BGR ! appsink"
+        )
+    
+    def open_capture(prefer_csi=True):
+        is_jetson = (platform.machine() == "aarch64")
+        if not is_jetson:
+            return cv2.VideoCapture(0)  # Windows/일반 PC
+        # Jetson: GStreamer 사용
+        pipeline = _gst_pipeline_csi() if prefer_csi else _gst_pipeline_usb()
+        cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+        if not cap.isOpened():
+            # 폴백: USB 카메라 혹은 기본 0시도
+            cap = cv2.VideoCapture(0)
+        return cap
 
     def stop(self):
-        self.running = False
+        self._running = False
+        if self.cap:
+            self.cap.release()
         self.wait()

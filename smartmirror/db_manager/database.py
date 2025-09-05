@@ -7,50 +7,55 @@ BEAUTY_DATA = {
     '20': {
         'spring_warm': {
             'title': '20호 봄 웜톤 🌸', 'desc': "화사하고 생기 넘치는 당신! 인간 복숭아가 따로 없네요. 따뜻하고 밝은 코랄, 피치 컬러로 사랑스러움을 극대화해보세요.",
-            'base': {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
             'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         },
         'summer_cool': {
             'title': '20호 여름 쿨톤 ☀️', 'desc': "맑고 투명한 당신! 핑크빛이 살짝 돌아 청순하고 깨끗한 이미지를 가졌네요. 라벤더, 라이트 핑크 등 파스텔 컬러가 잘 어울려요.",
-            'base': {'지성': ['P021', 'P022'], '건성': ['P023', 'P024'], '복합성': ['P025', 'P026'], '민감성': ['P027', 'P028']},
-            'color': {'eye': ['P029', 'P030'], 'lip': ['P031', 'P032', 'P033']}, 'makeup_styles': ['M011', 'M012', 'M013']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         },
         'fall_warm': {
             'title': '20호 가을 웜톤 🍁',
             'desc': "깊고 분위기 있는 무드의 당신! 카멜, 올리브, 테라코타, 브릭 같은 따뜻하고 묵직한 컬러가 얼굴에 깊이를 더해줘요.",
-            'base': {
-                '지성': ['P041', 'P042'], '건성': ['P043', 'P044'], '복합성': ['P045', 'P046'], '민감성': ['P047', 'P048']},
-            'color': {'eye': ['P049', 'P050'], 'lip': ['P051', 'P052', 'P053'] }, 'makeup_styles': ['M021', 'M022', 'M023']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         },
         'winter_cool': {
             'title': '20호 겨울 쿨톤 ❄️',
             'desc': "선명한 대비가 잘 어울리는 당신! 푸시아, 블루레드, 버건디, 딥 플럼처럼 차갑고 또렷한 컬러가 존재감을 살려줘요.",
-            'base': {'지성': ['P061', 'P062'], '건성': ['P063', 'P064'], '복합성': ['P065', 'P066'], '민감성': ['P067', 'P068']},
-            'color': {'eye': ['P069', 'P070'], 'lip': ['P071', 'P072', 'P073']}, 'makeup_styles': ['M031', 'M032', 'M033']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         }
     },
     '21': {
         'spring_warm': {
             'title': '21호 봄 웜톤 🌸', 'desc': "화사하고 생기 있는 이미지의 당신! 코랄, 피치, 아이보리 등 따뜻하고 밝은 컬러로 매력을 발산해보세요.",
-            'base': {'지성': ['P101', 'P102'], '건성': ['P103', 'P104'], '복합성': ['P105', 'P106'], '민감성': ['P107', 'P108']},
-            'color': {'eye': ['P109', 'P110'], 'lip': ['P111', 'P112', 'P113']}, 'makeup_styles': ['M101', 'M102', 'M103']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         },
         'summer_cool': {
             'title': '21호 여름 쿨톤 ☀️', 'desc': "맑고 깨끗한 이미지의 당신! 라벤더, 파스텔 핑크 등 부드럽고 시원한 컬러로 청초함을 뽐내보세요.",
-            'base': {'지성': ['P121', 'P122'], '건성': ['P123', 'P124'], '복합성': ['P125', 'P126'], '민감성': ['P127', 'P128']},
-            'color': {'eye': ['P129', 'P130'], 'lip': ['P131', 'P132', 'P133']}, 'makeup_styles': ['M111', 'M112', 'M113']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         },
         'fall_warm': {
             'title': '21호 가을 웜톤 🍁',
             'desc': "부드럽고 고급스러운 무드의 당신! 카키, 카라멜, 코코아, 브릭 오렌지 등 저채도 웜 컬러가 피부를 건강하게 보여줘요.",
-            'base': {'지성': ['P141', 'P142'], '건성': ['P143', 'P144'], '복합성': ['P145', 'P146'], '민감성': ['P147', 'P148']},
-            'color': {'eye': ['P149', 'P150'], 'lip': ['P151', 'P152', 'P153']}, 'makeup_styles': ['M121', 'M122', 'M123']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         },
         'winter_cool': {
             'title': '21호 겨울 쿨톤 ❄️',
             'desc': "도시적이고 시크한 당신! 쿨 로즈, 블루톤 레드, 베리, 블랙/네이비 계열이 또렷한 인상을 완성해줘요.",
-            'base': {'지성': ['P161', 'P162'], '건성': ['P163', 'P164'], '복합성': ['P165', 'P166'], '민감성': ['P167', 'P168']},
-            'color': {'eye': ['P169', 'P170'], 'lip': ['P171', 'P172', 'P173']}, 'makeup_styles': ['M131', 'M132', 'M133']
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
+        },
+        'winter_cool': {
+            'title': '21호 겨울 쿨톤 ❄️',
+            'desc': "도시적이고 시크한 당신! 쿨 로즈, 블루톤 레드, 베리, 블랙/네이비 계열이 또렷한 인상을 완성해줘요.",
+            'base' : {'지성': ['P001', 'P002'], '건성': ['P003', 'P004'], '복합성': ['P005', 'P006'], '민감성': ['P007', 'P008']},
+            'color': {'eye': ['P009', 'P010'], 'lip': ['P011', 'P012', 'P013']}, 'makeup_styles': ['M001', 'M002', 'M003']
         }
     }
 }
@@ -102,7 +107,8 @@ class DatabaseManager:
                 type TEXT,
                 category TEXT,
                 skin_types TEXT,
-                personal_colors TEXT
+                personal_colors TEXT,
+                style_videos TEXT
             )
         ''')
         
@@ -149,13 +155,14 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_name)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
-        personal_color_str = f"{tone}_{color}"
 
-        results = []
+        tone = str(tone)
+        # DB에 20/21만 있으므로 22/23은 21로 폴백
+        tone_for_query = tone if tone in ('20', '21') else '21'
+        personal_color_str = f"{tone_for_query}_{color}"
+
         cursor.execute("SELECT * FROM products WHERE personal_colors LIKE ?", (f"%{personal_color_str}%",))
         results = [dict(row) for row in cursor.fetchall()]
-
         conn.close()
 
         if results:
@@ -165,6 +172,55 @@ class DatabaseManager:
                 'products': results
             }
         return None
+
+    
+    def get_products_by_name(self, product_name):
+        conn = sqlite3.connect(self.db_name)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        search_name = product_name.replace(' ', '').replace('\n', '')
+        
+        query = "SELECT * FROM products WHERE REPLACE(name, ' ', '') LIKE ?"
+        cursor.execute(query, (f'%{search_name}%',))
+        
+        result = cursor.fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+
+    # 호환용 별칭: 단일 제품 조회
+    def get_product_by_name(self, product_name):
+        return self.get_products_by_name(product_name)
+
+    # 추천 필터: personal_color(spring_warm 등), skin_type('지성' 등) 기준으로 조회
+    def get_products_by_filter(self, personal_color=None, skin_type=None, exclude_id=None, limit=6):
+        conn = sqlite3.connect(self.db_name)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        where = []
+        params = []
+
+        if personal_color:
+            where.append("personal_colors LIKE ?")
+            params.append(f"%_{personal_color}%")
+        if skin_type:
+            where.append("skin_types LIKE ?")
+            params.append(f"%{skin_type}%")
+        if exclude_id is not None:
+            where.append("id != ?")
+            params.append(exclude_id)
+
+        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        sql = f"SELECT * FROM products{where_sql} LIMIT ?"
+        params.append(int(limit))
+
+        cursor.execute(sql, tuple(params))
+        rows = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return rows
+    
 
 if __name__ == '__main__':
     dm = DatabaseManager()

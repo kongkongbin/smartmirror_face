@@ -21,8 +21,8 @@ class WebcamGuideLabel(QLabel):
             qp.setPen(QPen(QColor(255, 255, 255, 150), 5))
             
             rect = self.rect()
-            width = rect.width() * 0.8
-            height = rect.height() * 0.8
+            width = rect.height() * 0.8
+            height = rect.width() * 0.8
             
             x = (rect.width() - width) / 2
             y = (rect.height() - height) / 2

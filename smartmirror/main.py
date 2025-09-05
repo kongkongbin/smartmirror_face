@@ -18,6 +18,7 @@ from webcam_thread.webcam import WebcamThread
 
 # 분석 스레드 모듈 임포트
 from analysis_worker import AnalysisWorker
+from product_analysis_worker import ProductAnalysisWorker
 
 # 데이터베이스 관리 모듈 임포트
 from db_manager.database import DatabaseManager
@@ -79,7 +80,43 @@ class BeautyFinderApp(QMainWindow):
         self.pages['face_capture'].capture_btn.clicked.connect(self.start_face_analysis)
 
     def start_product_analysis(self):
-        QMessageBox.information(self, "안내", "제품 분석 기능을 시작합니다.")
+        if self.webcam_last_frame is None or self.webcam_last_frame.size == 0:
+            QMessageBox.warning(self, "안내", "웹캠 프레임을 아직 받지 못했어요.")
+            return
+
+        self.stop_webcam()
+        self.pages['loading'].set_message("제품을 인식하고 있어요...", "잠시만 기다려 주세요")
+        self.stacked_widget.setCurrentWidget(self.pages['loading'])
+        QApplication.processEvents()
+        
+        self.product_analysis_thread = ProductAnalysisWorker(self.webcam_last_frame, self.db_manager)
+        self.product_analysis_thread.finished_ok.connect(self.on_product_analysis_done)
+        self.product_analysis_thread.finished_err.connect(self.on_product_analysis_error)
+        self.product_analysis_thread.finished.connect(self.product_analysis_thread.deleteLater)
+        self.product_analysis_thread.start()
+
+    def on_product_analysis_done(self, result_data):
+        # 안전 가드: 추천 페이지 메서드가 없는 경우에도 앱이 죽지 않도록 처리
+        page = self.pages.get('product_recommend')
+        if page and hasattr(page, 'update_recommendations'):
+            try:
+                page.update_recommendations(result_data)
+                self.stacked_widget.setCurrentWidget(page)
+                return
+            except Exception as e:
+                QMessageBox.critical(self, "표시 오류", f"추천 화면을 그리는 중 오류가 발생했어요: {str(e)}")
+        # 폴백: 인식된 제품명만 안내하고 홈으로
+        try:
+            found = (result_data or {}).get('found_product') or {}
+            pname = found.get('name') or found.get('brand') or '제품'
+            QMessageBox.information(self, "제품 인식 완료", f"인식된 제품: {pname}\n추천 화면은 아직 준비 중이에요.")
+        except Exception:
+            QMessageBox.information(self, "제품 인식 완료", "추천 화면은 아직 준비 중이에요.")
+        self.go_home()
+
+    def on_product_analysis_error(self, msg):
+        QMessageBox.critical(self, "OCR 분석 오류", msg)
+        self.go_home()
 
     def start_face_analysis(self):
         if self.webcam_last_frame is None or self.webcam_last_frame.size == 0:
@@ -87,25 +124,39 @@ class BeautyFinderApp(QMainWindow):
             return
 
         self.stop_webcam()
+        self.pages['loading'].set_message("피부톤을 분석하고 있어요...", "잠시만 기다려 주세요")
         self.stacked_widget.setCurrentWidget(self.pages['loading'])
         QApplication.processEvents()
 
         self.analysis_thread = AnalysisWorker(self.webcam_last_frame)
         self.analysis_thread.finished_ok.connect(self.on_analysis_done)
         self.analysis_thread.finished_err.connect(self.on_analysis_error)
+        self.analysis_thread.finished.connect(self.analysis_thread.deleteLater)
         self.analysis_thread.start()
 
-    def on_analysis_done(self, user_tone_num, user_color):
+    def on_analysis_done(self, user_tone_num, user_color, brightness):
         self.user_tone = user_tone_num
         self.user_color = user_color
-        
+
+        QMessageBox.information(
+            self, "피부 분석 결과",
+            f"피부톤: {user_tone_num}호\n퍼스널 컬러: {user_color}\n피부 밝기: {brightness:.2f}"
+        )
+
         result_data = self.db_manager.get_beauty_data(self.user_tone, self.user_color)
         if result_data:
             self.pages['face_result'].update_result(result_data)
             self.stacked_widget.setCurrentWidget(self.pages['face_result'])
         else:
-            QMessageBox.critical(self, "오류", "분석 결과를 불러오는 데 실패했어요.")
-            self.go_home()
+            # DB 매칭이 없더라도 결과 화면은 표시
+            fallback = {
+                'title': f"{self.user_tone} {self.user_color}",
+                'desc': 'DB에 매칭되는 제품이 아직 없어요. 결과만 먼저 보여드립니다.',
+                'products': []
+            }
+            self.pages['face_result'].update_result(fallback)
+            self.stacked_widget.setCurrentWidget(self.pages['face_result'])
+
             
     def on_analysis_error(self, msg):
         QMessageBox.critical(self, "분석 오류", msg)
