@@ -1,0 +1,11 @@
+numpy==1.19.5
+scipy==1.5.4
+scikit-learn==0.24.2
+joblib==1.1.0
+threadpoolctl==2.2.0
+# Optional: pure-Python libs (no ABI issues)
+Pillow==8.4.0
+colormath==3.0.0
+imutils==0.5.4
+# Do NOT install opencv-python on Jetson; use apt: python3-opencv
+# PyQt5 also via apt on Jetson (python3-pyqt5)
