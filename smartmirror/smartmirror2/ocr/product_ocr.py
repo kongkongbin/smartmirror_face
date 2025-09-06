@@ -1,77 +1,98 @@
-# ocr/product_ocr.py (patched)
-import easyocr
+# ocr/product_ocr.py
 import cv2
 import numpy as np
 import re
 
-# EasyOCR 초기화(지연 초기화 대신 모듈 전역 1회)
-# 한국어 우선 + 영어 보조
-reader = easyocr.Reader(['ko', 'en'], gpu=False)
+# Optional backends
+_BACKEND = None
+_reader = None
 
-def _resize_keep_ratio(img, max_w=1280):
-    h, w = img.shape[:2]
-    if w > max_w:
-        r = max_w / float(w)
-        return cv2.resize(img, (max_w, int(h*r)), interpolation=cv2.INTER_AREA)
-    return img
-
-def _enhance(image):
-    # 그레이스케일 + CLAHE + 가벼운 샤프닝
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray = clahe.apply(gray)
-    # 샤프닝 커널
-    kernel = np.array([[0, -1, 0],
-                       [-1, 5, -1],
-                       [0, -1, 0]], dtype=np.float32)
-    sharp = cv2.filter2D(gray, -1, kernel)
-    return sharp
-
-def _korean_ratio(s: str) -> float:
-    if not s:
-        return 0.0
-    total = max(1, len(s))
-    ko = sum(1 for ch in s if '\uAC00' <= ch <= '\uD7A3')
-    return ko / total
-
-def _read_text(img) -> tuple[str, float]:
-    # detail=1로 confidence 확보
-    results = reader.readtext(img, detail=1, paragraph=True, contrast_ths=0.05, adjust_contrast=0.7)
-    texts = []
-    confs = []
-    for r in results:
-        try:
-            _, txt, conf = r
-        except ValueError:
-            # 일부 버전은 (bbox, text, conf)
-            txt = r[1] if len(r) > 1 else ""
-            conf = r[2] if len(r) > 2 else 0.0
-        if isinstance(txt, str) and txt.strip():
-            texts.append(txt.strip())
-            try:
-                confs.append(float(conf))
-            except Exception:
-                pass
-    joined = " ".join(texts)
-    clean = re.sub(r"[\n\r\t]+", " ", joined).strip()
-    mean_conf = float(np.mean(confs)) if confs else 0.0
-    return clean, mean_conf
-
-def process_ocr(image_bgr: np.ndarray) -> str:
-    """전처리 + 원본/좌우반전 모두 시도 후 더 그럴듯한 텍스트 반환"""
+def _try_import_easyocr():
+    global _BACKEND, _reader
     try:
-        img = _resize_keep_ratio(image_bgr, max_w=1280)
-        enh = _enhance(img)
+        import easyocr
+        _reader = easyocr.Reader(['ko', 'en'], gpu=False)  # Jetson/CPU에서도 동작
+        _BACKEND = "easyocr"
+    except Exception:
+        _BACKEND = None
 
-        t1, c1 = _read_text(enh)
-        t2, c2 = _read_text(cv2.flip(enh, 1))
+def _try_import_tesseract():
+    global _BACKEND
+    try:
+        import pytesseract  # noqa: F401
+        _BACKEND = "tesseract"
+    except Exception:
+        _BACKEND = None
 
-        s1 = 0.6 * _korean_ratio(t1) + 0.4 * c1
-        s2 = 0.6 * _korean_ratio(t2) + 0.4 * c2
+def _ensure_backend():
+    if _BACKEND is None:
+        _try_import_easyocr()
+        if _BACKEND is None:
+            _try_import_tesseract()
+    return _BACKEND
 
-        best = t1 if s1 >= s2 else t2
-        best = re.sub(r"\s+", " ", best).strip()
-        return best
+def _preprocess(img_bgr):
+    # 종횡비 유지로 적당히 확대(가로 최대 1280)
+    h, w = img_bgr.shape[:2]
+    if w > 1280:
+        r = 1280 / float(w)
+        img_bgr = cv2.resize(img_bgr, (1280, int(h*r)), interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    gray = clahe.apply(gray)
+    return gray
+
+def _korean_ratio(s):
+    if not s: return 0.0
+    total = len(s)
+    ko = sum(1 for ch in s if '\uAC00' <= ch <= '\uD7A3')
+    return ko / max(1, total)
+
+def _run_easyocr(gray):
+    results = _reader.readtext(gray, detail=0)
+    txt = " ".join(results)
+    return txt
+
+def _run_tesseract(gray):
+    import pytesseract
+    cfg = "--oem 3 --psm 6 -l kor+eng"
+    txt = pytesseract.image_to_string(gray, config=cfg)
+    return txt
+
+def process_ocr(image):
+    """
+    EasyOCR을 우선 사용. 사용 불가 시 Tesseract로 폴백.
+    좌우반전(미러) 입력 가능성을 고려하여 원본/미러 모두 시도.
+    """
+    try:
+        backend = _ensure_backend()
+        if backend is None:
+            # 백엔드가 하나도 없는 경우
+            return ""
+
+        gray = _preprocess(image)
+        gray_flip = cv2.flip(gray, 1)
+
+        if backend == "easyocr":
+            t1 = _run_easyocr(gray)
+            t2 = _run_easyocr(gray_flip)
+        else:
+            t1 = _run_tesseract(gray)
+            t2 = _run_tesseract(gray_flip)
+
+        def _clean(s):
+            s = re.sub(r'[\n\r\t]+', ' ', s)
+            # 극단적 특수문자 제거
+            s = re.sub(r'[^0-9A-Za-z가-힣 \-_/\.]+', ' ', s)
+            return re.sub(r'\s+', ' ', s).strip()
+
+        c1, c2 = _clean(t1), _clean(t2)
+        # 한글 비율을 우선 가중치로 선택
+        s1 = 0.6 * _korean_ratio(c1) + 0.4 * (len(c1) > 0)
+        s2 = 0.6 * _korean_ratio(c2) + 0.4 * (len(c2) > 0)
+
+        return c1 if s1 >= s2 else c2
+
     except Exception as e:
         print(f"OCR 처리 중 오류 발생: {e}")
         return ""

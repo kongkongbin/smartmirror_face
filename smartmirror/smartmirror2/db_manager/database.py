@@ -151,19 +151,20 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    def get_beauty_data(self, tone, color):
+    
+def get_beauty_data(self, tone, color):
         conn = sqlite3.connect(self.db_name)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         tone = str(tone)
-        tone_for_query = tone if tone in ('20','21') else '21'
+        # DB에는 20/21 기준 데이터가 있으므로 22/23은 21로 폴백해서 조회
+        tone_for_query = tone if tone in ('20', '21') else '21'
         personal_color_str = f"{tone_for_query}_{color}"
 
         results = []
         cursor.execute("SELECT * FROM products WHERE personal_colors LIKE ?", (f"%{personal_color_str}%",))
         results = [dict(row) for row in cursor.fetchall()]
-
         conn.close()
 
         if results:
@@ -173,7 +174,7 @@ class DatabaseManager:
                 'products': results
             }
         return None
-    
+
     def get_products_by_name(self, product_name):
         conn = sqlite3.connect(self.db_name)
         conn.row_factory = sqlite3.Row
@@ -193,27 +194,31 @@ if __name__ == '__main__':
     print("Database 'beauty.db' created and populated with sample data successfully.")
 
 
-def get_product_by_name(self, product_name):
-    """Compatibility alias for singular lookup."""
-    return self.get_products_by_name(product_name)
+    # 호환용 별칭: 단일 제품 반환
+    def get_product_by_name(self, product_name):
+        return self.get_products_by_name(product_name)
 
 
-def get_products_by_filter(self, personal_color=None, skin_type=None, exclude_id=None, limit=6):
-    """Filter products by personal_color (e.g., 'spring_warm') and skin_type (e.g., '지성')."""
-    import sqlite3
-    conn = sqlite3.connect(self.db_name); conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    where = []; params = []
-    if personal_color:
-        where.append("personal_colors LIKE ?"); params.append("%%_%s%%" % personal_color)
-    if skin_type:
-        where.append("skin_types LIKE ?"); params.append("%%%s%%" % skin_type)
-    if exclude_id is not None:
-        where.append("id != ?"); params.append(exclude_id)
-    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
-    sql = "SELECT * FROM products%s LIMIT ?" % where_sql
-    params.append(int(limit))
-    cur.execute(sql, tuple(params))
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
+    # 추천용 필터: personal_color(e.g., 'spring_warm'), skin_type(e.g., '지성')
+    def get_products_by_filter(self, personal_color=None, skin_type=None, exclude_id=None, limit=6):
+        conn = sqlite3.connect(self.db_name)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        where = []
+        params = []
+        if personal_color:
+            where.append("personal_colors LIKE ?")
+            params.append("%%_%s%%" % personal_color)
+        if skin_type:
+            where.append("skin_types LIKE ?")
+            params.append("%%%s%%" % skin_type)
+        if exclude_id is not None:
+            where.append("id != ?")
+            params.append(exclude_id)
+        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        sql = "SELECT * FROM products%s LIMIT ?" % where_sql
+        params.append(int(limit))
+        cursor.execute(sql, tuple(params))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows

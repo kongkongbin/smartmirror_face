@@ -1,48 +1,10 @@
-
-import platform
 import cv2
+import platform
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QImage
 
-def _gst_pipeline_csi(width=1280, height=720, fps=30, flip_method=0):
-    return (
-        f"nvarguscamerasrc ! video/x-raw(memory:NVMM), width={width}, height={height}, "
-        f"format=NV12, framerate={fps}/1 ! nvvidconv flip-method={flip_method} ! "
-        f"video/x-raw, format=BGRx ! videoconvert ! video/x-raw, format=BGR ! appsink"
-    )
-
-def _gst_pipeline_usb(dev_index=0, width=1280, height=720, fps=30):
-    return (
-        f"v4l2src device=/dev/video{dev_index} ! video/x-raw, width={width}, height={height}, framerate={fps}/1 ! "
-        f"videoconvert ! video/x-raw, format=BGR ! appsink"
-    )
-
-def _open_capture(prefer_csi=True):
-    is_jetson = (platform.machine() == "aarch64")
-    if is_jetson:
-        # Try CSI first then USB
-        if prefer_csi:
-            cap = cv2.VideoCapture(_gst_pipeline_csi(), cv2.CAP_GSTREAMER)
-            if cap.isOpened():
-                return cap
-            cap = cv2.VideoCapture(_gst_pipeline_usb(), cv2.CAP_GSTREAMER)
-            if cap.isOpened():
-                return cap
-        else:
-            cap = cv2.VideoCapture(_gst_pipeline_usb(), cv2.CAP_GSTREAMER)
-            if cap.isOpened():
-                return cap
-            cap = cv2.VideoCapture(_gst_pipeline_csi(), cv2.CAP_GSTREAMER)
-            if cap.isOpened():
-                return cap
-        # Fallback
-        cap = cv2.VideoCapture(0)
-        return cap
-    # Non-Jetson platforms: default camera
-    return cv2.VideoCapture(0)
-
 class WebcamThread(QThread):
-    # QImage(display), object(raw_bgr_original)
+    # UI 표시용 QImage, 분석용 원본 ndarray(BGR)
     change_pixmap_signal = pyqtSignal(QImage, object)
 
     def __init__(self, rotate=False, mirror=True, prefer_csi=True, parent=None):
@@ -53,10 +15,52 @@ class WebcamThread(QThread):
         self.mirror = mirror
         self.prefer_csi = prefer_csi
 
+    def _gst_pipeline_csi(self, width=1280, height=720, fps=30, flip_method=0):
+        return (
+            "nvarguscamerasrc ! "
+            "video/x-raw(memory:NVMM), width=%d, height=%d, format=NV12, framerate=%d/1 ! "
+            "nvvidconv flip-method=%d ! "
+            "video/x-raw, format=BGRx ! "
+            "videoconvert ! "
+            "video/x-raw, format=BGR ! "
+            "appsink" % (width, height, fps, flip_method)
+        )
+
+    def _gst_pipeline_usb(self, dev_index=0, width=1280, height=720, fps=30):
+        return (
+            "v4l2src device=/dev/video%d ! "
+            "video/x-raw, width=%d, height=%d, framerate=%d/1 ! "
+            "videoconvert ! "
+            "video/x-raw, format=BGR ! "
+            "appsink" % (dev_index, width, height, fps)
+        )
+
+    def _open_capture(self):
+        is_jetson = (platform.machine() == "aarch64")
+        if is_jetson:
+            # 우선 CSI 카메라 시도
+            if self.prefer_csi:
+                pipeline = self._gst_pipeline_csi()
+                cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+                if cap.isOpened():
+                    return cap
+            # USB 카메라 파이프라인 시도
+            pipeline = self._gst_pipeline_usb()
+            cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+            if cap.isOpened():
+                return cap
+            # 마지막 폴백
+            cap = cv2.VideoCapture(0)
+            return cap
+        else:
+            # 일반 PC(Windows/Linux): 기본 장치 오픈
+            # (Windows에서 CAP_DSHOW는 기기/드라이버에 따라 실패 가능하므로 생략)
+            return cv2.VideoCapture(0)
+
     def run(self):
-        self.cap = _open_capture(prefer_csi=self.prefer_csi)
+        self.cap = self._open_capture()
         if not self.cap or not self.cap.isOpened():
-            print("Error: 카메라를 열 수 없습니다.")
+            print("Error: 웹캠을 열 수 없습니다.")
             self.running = False
             return
 
@@ -65,20 +69,21 @@ class WebcamThread(QThread):
             if not ret:
                 continue
 
-            raw_bgr = frame  # 분석용 원본(미러/회전 적용 금지)
+            raw_original = frame  # 분석용 원본 BGR
 
-            display = frame
+            display_frame = frame
             if self.rotate:
-                display = cv2.rotate(display, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                display_frame = cv2.rotate(display_frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
             if self.mirror:
-                display = cv2.flip(display, 1)
+                display_frame = cv2.flip(display_frame, 1)
 
-            h, w, ch = display.shape
+            h, w, ch = display_frame.shape
             bytes_per_line = ch * w
-            qimg = QImage(display.data, w, h, bytes_per_line, QImage.Format_BGR888)
+            # QImage는 버퍼 수명에 민감하므로 copy=False로 생성 후 Qt가 그리기 전에 유효하도록 즉시 변환
+            qimg = QImage(display_frame.data, w, h, bytes_per_line, QImage.Format_BGR888).copy()
 
-            # 화면: 미러 적용 QImage, 분석: 원본 BGR
-            self.change_pixmap_signal.emit(qimg, raw_bgr)
+            # UI에는 미러/회전 적용 이미지를, 분석에는 원본 프레임을 전달
+            self.change_pixmap_signal.emit(qimg, raw_original)
 
         if self.cap:
             self.cap.release()
